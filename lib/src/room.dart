@@ -52,6 +52,22 @@ const Map<HistoryVisibility, String> _historyVisibilityMap = {
   HistoryVisibility.worldReadable: 'world_readable',
 };
 
+enum HangupCause {
+  iceTimeout,
+  userHangup,
+  userMediaFailed,
+  userBusy,
+  unknownError,
+}
+
+const Map<HangupCause, String> _hangupCauseMap = {
+  HangupCause.iceTimeout: 'ice_timeout',
+  HangupCause.userHangup: 'user_hangup',
+  HangupCause.userMediaFailed: 'user_media_failed',
+  HangupCause.userBusy: 'user_busy',
+  HangupCause.unknownError: 'unknown_error',
+};
+
 const String messageSendingStatusKey =
     'com.famedly.famedlysdk.message_sending_status';
 
@@ -1493,8 +1509,9 @@ class Room {
   /// clients should discard it. They should also no longer show the call as awaiting an answer in the UI.
   /// [type] The type of session description. Must be 'offer'.
   /// [sdp] The SDP text of the session description.
-  Future<String> inviteToCall(String callId, int lifetime, String sdp,
-      {String type = 'offer', int version = 0, String txid}) async {
+  Future<String> inviteToCall(
+      String callId, int lifetime, String sdp, String invitee,
+      {String type = 'offer', int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
@@ -1502,9 +1519,98 @@ class Room {
       'lifetime': lifetime,
       'offer': {'sdp': sdp, 'type': type},
       'version': version,
+      'invitee': invitee,
     };
     return await _sendContent(
       EventTypes.CallInvite,
+      content,
+      txid: txid,
+    );
+  }
+
+  /*
+    {
+      "type": "m.call.select_answer",
+      "content": {
+          "version": 1,
+          "call_id": "12345",
+          "party_id": "67890",
+          "selected_party_id": "111213",
+      },
+  }
+  */
+  Future<String> selectCallAnswer(
+      String callId, int lifetime, String party_id, String selected_party_id,
+      {int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+
+    final content = {
+      'call_id': callId,
+      'lifetime': lifetime,
+      'party_id': party_id,
+      'selected_party_id': selected_party_id,
+      'version': version,
+    };
+
+    return await _sendContent(
+      EventTypes.CallSelectAnswer,
+      content,
+      txid: txid,
+    );
+  }
+
+  // {
+  //   "type": "m.call.reject",
+  //   "content" : {
+  //       "version": 1,
+  //       "call_id": "12345",
+  //       "party_id": "67890",
+  //   }
+  // }
+
+  Future<String> sendCallReject(String callId, int lifetime, String party_id,
+      {int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+
+    final content = {
+      'call_id': callId,
+      'lifetime': lifetime,
+      'party_id': party_id,
+      'version': version,
+    };
+
+    return await _sendContent(
+      EventTypes.CallReject,
+      content,
+      txid: txid,
+    );
+  }
+
+  // {
+  //     "type": "m.call.negotiate",
+  //     "content": {
+  //         "call_id": "12345",
+  //         "party_id": "67890",
+  //         "lifetime": 10000,
+  //   "description": {
+  //             "sdp": "[some sdp]",
+  //             "type": "offer",
+  //   },
+  //     }
+  // }
+
+  Future<String> sendReNegotiation(
+      String callId, int lifetime, String party_id, String sdp,
+      {String type = 'offer', int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+    final content = {
+      'call_id': callId,
+      'lifetime': lifetime,
+      'description': {'sdp': sdp, 'type': type},
+      'version': version,
+    };
+    return await _sendContent(
+      EventTypes.CallNegotiate,
       content,
       txid: txid,
     );
@@ -1531,7 +1637,7 @@ class Room {
   Future<String> sendCallCandidates(
     String callId,
     List<Map<String, dynamic>> candidates, {
-    int version = 0,
+    int version = 1,
     String txid,
   }) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
@@ -1552,11 +1658,12 @@ class Room {
   /// [version] is the version of the VoIP specification this message adheres to. This specification is version 0.
   /// [type] The type of session description. Must be 'answer'.
   /// [sdp] The SDP text of the session description.
-  Future<String> answerCall(String callId, String sdp,
-      {String type = 'answer', int version = 0, String txid}) async {
+  Future<String> answerCall(String callId, String sdp, String party_id,
+      {String type = 'answer', int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
+      'party_id': party_id,
       'answer': {'sdp': sdp, 'type': type},
       'version': version,
     };
@@ -1570,13 +1677,14 @@ class Room {
   /// This event is sent by the callee when they wish to answer the call.
   /// [callId] The ID of the call this event relates to.
   /// [version] is the version of the VoIP specification this message adheres to. This specification is version 0.
-  Future<String> hangupCall(String callId,
-      {int version = 0, String txid}) async {
+  Future<String> hangupCall(String callId, HangupCause cause,
+      {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
       'call_id': callId,
       'version': version,
+      if (cause != null) 'reason': _hangupCauseMap[cause],
     };
     return await _sendContent(
       EventTypes.CallHangup,
