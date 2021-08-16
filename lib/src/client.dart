@@ -800,10 +800,10 @@ class Client extends MatrixApi {
   final StreamController<Event> onCallSelectAnswer =
       StreamController.broadcast();
 
-  /// Will be called on select rejects.
+  /// Will be called on rejects.
   final StreamController<Event> onCallReject = StreamController.broadcast();
 
-  /// Will be called on select negotiates.
+  /// Will be called on negotiates.
   final StreamController<Event> onCallNegotiate = StreamController.broadcast();
 
   /// Will be called when another device is requesting session keys for a room.
