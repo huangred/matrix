@@ -1504,22 +1504,26 @@ class Room {
 
   /// This is sent by the caller when they wish to establish a call.
   /// [callId] is a unique identifier for the call.
-  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 0.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
   /// [lifetime] is the time in milliseconds that the invite is valid for. Once the invite age exceeds this value,
   /// clients should discard it. They should also no longer show the call as awaiting an answer in the UI.
   /// [type] The type of session description. Must be 'offer'.
   /// [sdp] The SDP text of the session description.
+  /// [invitee] The user ID of the person who is being invited. Invites without an invitee field are defined to be
+  /// intended for any member of the room other than the sender of the event.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> inviteToCall(
-      String callId, int lifetime, String sdp, String invitee,
+      String callId, int lifetime, String party_id, String invitee, String sdp,
       {String type = 'offer', int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
       'call_id': callId,
+      'party_id': party_id,
+      'version': version,
       'lifetime': lifetime,
       'offer': {'sdp': sdp, 'type': type},
-      'version': version,
-      'invitee': invitee,
+      if (invitee != null) 'invitee': invitee,
     };
     return await _sendContent(
       EventTypes.CallInvite,
@@ -1528,17 +1532,15 @@ class Room {
     );
   }
 
-  /*
-    {
-      "type": "m.call.select_answer",
-      "content": {
-          "version": 1,
-          "call_id": "12345",
-          "party_id": "67890",
-          "selected_party_id": "111213",
-      },
-  }
-  */
+  /// The calling party sends the party_id of the first selected answer.
+  ///
+  /// Usually after receiving the first answer sdp in the client.onCallAnswer event,
+  /// save the `party_id`, and then send `CallSelectAnswer` to others peers that the call has been picked up.
+  ///
+  /// [callId] is a unique identifier for the call.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  /// [selected_party_id] The party ID for the selected answer.
   Future<String> selectCallAnswer(
       String callId, int lifetime, String party_id, String selected_party_id,
       {int version = 1, String txid}) async {
@@ -1546,10 +1548,10 @@ class Room {
 
     final content = {
       'call_id': callId,
-      'lifetime': lifetime,
       'party_id': party_id,
-      'selected_party_id': selected_party_id,
       'version': version,
+      'lifetime': lifetime,
+      'selected_party_id': selected_party_id,
     };
 
     return await _sendContent(
@@ -1559,24 +1561,19 @@ class Room {
     );
   }
 
-  // {
-  //   "type": "m.call.reject",
-  //   "content" : {
-  //       "version": 1,
-  //       "call_id": "12345",
-  //       "party_id": "67890",
-  //   }
-  // }
-
+  /// Reject a call
+  /// [callId] is a unique identifier for the call.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> sendCallReject(String callId, int lifetime, String party_id,
       {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
       'call_id': callId,
-      'lifetime': lifetime,
       'party_id': party_id,
       'version': version,
+      'lifetime': lifetime,
     };
 
     return await _sendContent(
@@ -1586,28 +1583,21 @@ class Room {
     );
   }
 
-  // {
-  //     "type": "m.call.negotiate",
-  //     "content": {
-  //         "call_id": "12345",
-  //         "party_id": "67890",
-  //         "lifetime": 10000,
-  //   "description": {
-  //             "sdp": "[some sdp]",
-  //             "type": "offer",
-  //   },
-  //     }
-  // }
-
-  Future<String> sendReNegotiation(
+  /// When local audio/video tracks are added/deleted or hold/unhold,
+  /// need to createOffer and renegotiation.
+  /// [callId] is a unique identifier for the call.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  Future<String> sendCallNegotiate(
       String callId, int lifetime, String party_id, String sdp,
       {String type = 'offer', int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
+      'party_id': party_id,
+      'version': version,
       'lifetime': lifetime,
       'description': {'sdp': sdp, 'type': type},
-      'version': version,
     };
     return await _sendContent(
       EventTypes.CallNegotiate,
@@ -1621,7 +1611,9 @@ class Room {
   ///
   /// [callId] The ID of the call this event relates to.
   ///
-  /// [version] The version of the VoIP specification this messages adheres to. This specification is version 0.
+  /// [version] The version of the VoIP specification this messages adheres to. This specification is version 1.
+  ///
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
   ///
   /// [candidates] Array of objects describing the candidates. Example:
   ///
@@ -1636,6 +1628,7 @@ class Room {
   /// ```
   Future<String> sendCallCandidates(
     String callId,
+    String party_id,
     List<Map<String, dynamic>> candidates, {
     int version = 1,
     String txid,
@@ -1643,8 +1636,9 @@ class Room {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
-      'candidates': candidates,
+      'party_id': party_id,
       'version': version,
+      'candidates': candidates,
     };
     return await _sendContent(
       EventTypes.CallCandidates,
@@ -1655,17 +1649,18 @@ class Room {
 
   /// This event is sent by the callee when they wish to answer the call.
   /// [callId] is a unique identifier for the call.
-  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 0.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
   /// [type] The type of session description. Must be 'answer'.
   /// [sdp] The SDP text of the session description.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> answerCall(String callId, String sdp, String party_id,
       {String type = 'answer', int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
       'party_id': party_id,
-      'answer': {'sdp': sdp, 'type': type},
       'version': version,
+      'answer': {'sdp': sdp, 'type': type},
     };
     return await _sendContent(
       EventTypes.CallAnswer,
@@ -1676,13 +1671,15 @@ class Room {
 
   /// This event is sent by the callee when they wish to answer the call.
   /// [callId] The ID of the call this event relates to.
-  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 0.
-  Future<String> hangupCall(String callId, HangupCause cause,
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  Future<String> hangupCall(String callId, String party_id, HangupCause cause,
       {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
       'call_id': callId,
+      'party_id': party_id,
       'version': version,
       if (cause != null) 'reason': _hangupCauseMap[cause],
     };
