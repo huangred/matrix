@@ -2133,6 +2133,12 @@ class FakeMatrixApi extends MockClient {
           (var req) => {},
       '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.answer/1234':
           (var req) => {},
+      '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.select_answer/1234':
+          (var req) => {},
+      '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.reject/1234':
+          (var req) => {},
+      '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.negotiate/1234':
+          (var req) => {},
       '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.candidates/1234':
           (var req) => {},
       '/client/r0/rooms/!localpart%3Aserver.abc/send/m.call.hangup/1234':
