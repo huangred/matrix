@@ -613,8 +613,12 @@ void main() {
       await room.inviteToCall('1234', 1234, '4567', '7890', 'sdp',
           txid: '1234');
       await room.answerCall('1234', 'sdp', '4567', txid: '1234');
-      await room.hangupCall('1234', '4567', null, txid: '1234');
       await room.sendCallCandidates('1234', '4567', [], txid: '1234');
+      await room.selectCallAnswer('1234', 1234, '4567', '6789', txid: '1234');
+      await room.sendCallReject('1234', 1234, '4567', txid: '1234');
+      await room.sendCallNegotiate('1234', 1234, '4567', 'sdp', txid: '1234');
+      await room.hangupCall('1234', '4567', HangupCause.userHangup,
+          txid: '1234');
     });
 
     test('enableEncryption', () async {
