@@ -800,6 +800,9 @@ class Client extends MatrixApi {
   /// Will be called on call answers.
   final StreamController<Event> onCallAnswer = StreamController.broadcast();
 
+  /// Will be called on call replaces.
+  final StreamController<Event> onCallReplaces = StreamController.broadcast();
+
   /// Will be called on select answers.
   final StreamController<Event> onCallSelectAnswer =
       StreamController.broadcast();
@@ -1459,6 +1462,9 @@ class Client extends MatrixApi {
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallNegotiate) {
           onCallNegotiate
+              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+        } else if (rawUnencryptedEvent['type'] == EventTypes.CallReplaces) {
+          onCallReplaces
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
         }
       }
