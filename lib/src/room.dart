@@ -67,6 +67,20 @@ const Map<HangupCause, String> _hangupCauseMap = {
   HangupCause.unknownError: 'unknown_error',
 };
 
+abstract class ExtraEventTypes {
+  static const String CallSelectAnswer = 'm.call.select_answer';
+  static const String CallReject = 'm.call.reject';
+  static const String CallNegotiate = 'm.call.negotiate';
+  static const String CallSDPStreamMetadataChanged =
+      'm.call.sdp_stream_metadata_changed';
+  static const String CallSDPStreamMetadataChangedPrefix =
+      'org.matrix.call.sdp_stream_metadata_changed';
+  static const String CallReplaces = 'm.call.replaces';
+  static const String CallAssertedIdentity = 'm.call.asserted_identity';
+  static const String CallAssertedIdentityPrefix =
+      'org.matrix.call.asserted_identity';
+}
+
 const String messageSendingStatusKey =
     'com.famedly.famedlysdk.message_sending_status';
 
@@ -1551,7 +1565,7 @@ class Room {
     };
 
     return await _sendContent(
-      EventTypes.CallSelectAnswer,
+      ExtraEventTypes.CallSelectAnswer,
       content,
       txid: txid,
     );
@@ -1573,7 +1587,7 @@ class Room {
     };
 
     return await _sendContent(
-      EventTypes.CallReject,
+      ExtraEventTypes.CallReject,
       content,
       txid: txid,
     );
@@ -1596,7 +1610,7 @@ class Room {
       'description': {'sdp': sdp, 'type': type},
     };
     return await _sendContent(
-      EventTypes.CallNegotiate,
+      ExtraEventTypes.CallNegotiate,
       content,
       txid: txid,
     );
