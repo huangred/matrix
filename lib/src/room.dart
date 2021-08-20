@@ -52,6 +52,89 @@ const Map<HistoryVisibility, String> _historyVisibilityMap = {
   HistoryVisibility.worldReadable: 'world_readable',
 };
 
+// TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
+const String sdpStreamMetadataKey = 'org.matrix.msc3077.sdp_stream_metadata';
+
+/// m.call.negotiate
+/// m.call.answer
+class CallCapabilities {
+  bool transferee;
+  bool dtmf;
+  Map<String, dynamic> toMap() {
+    return {
+      if (transferee != null) 'm.call.transferee': transferee,
+      if (dtmf != null) 'm.call.dtmf': dtmf,
+    };
+  }
+}
+
+class CallReplacesTarget {
+  String id;
+  String display_name;
+  String avatar_url;
+  Map<String, dynamic> toMap() {
+    return {
+      if (id != null) 'id': id,
+      if (display_name != null) 'display_name': display_name,
+      if (avatar_url != null) 'avatar_url': avatar_url,
+    };
+  }
+}
+
+class CallReplacesEvent {
+  String replacement_id;
+  CallReplacesTarget target_user;
+  String create_call;
+  String await_call;
+  String target_room;
+  Map<String, dynamic> toMap() {
+    return {
+      'replacement_id': replacement_id,
+      'target_user': target_user.toMap(),
+      if (create_call != null) 'create_call': create_call,
+      if (await_call != null) 'await_call': await_call,
+      'target_room': target_room,
+    };
+  }
+}
+
+class SDPStreamMetadataPurpose {
+  static String Usermedia = 'm.usermedia';
+  static String Screenshare = 'm.screenshare';
+}
+
+/*
+This MSC proposes adding an sdp_stream_metadata field 
+to the events containing a session description i.e.:
+m.call.invite
+m.call.answer
+m.call.negotiate
+*/
+class SDPStreamPurpose {
+  // SDPStreamMetadataPurpose
+  String purpose;
+  bool audio_muted;
+  bool video_muted;
+  Map<String, dynamic> toMap() {
+    return {
+      'purpose': purpose,
+      if (audio_muted != null) 'audio_muted': audio_muted,
+      if (video_muted != null) 'video_muted': video_muted,
+    };
+  }
+}
+
+class SDPStreamMetadata {
+  Map<String, SDPStreamPurpose> sdpStreamMetadatas;
+  SDPStreamMetadata(this.sdpStreamMetadatas);
+  Map<String, dynamic> toMap() {
+    return {
+      sdpStreamMetadataKey:
+          sdpStreamMetadatas.map((key, value) => MapEntry(key, value.toMap())),
+    };
+  }
+}
+
 const String messageSendingStatusKey =
     'com.famedly.famedlysdk.message_sending_status';
 
@@ -1498,7 +1581,10 @@ class Room {
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> inviteToCall(
       String callId, int lifetime, String party_id, String invitee, String sdp,
-      {String type = 'offer', int version = 1, String txid}) async {
+      {String type = 'offer',
+      int version = 1,
+      String txid,
+      SDPStreamMetadata metadata}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
@@ -1507,7 +1593,8 @@ class Room {
       'version': version,
       'lifetime': lifetime,
       'offer': {'sdp': sdp, 'type': type},
-      if (invitee != null) 'invitee': invitee
+      if (invitee != null) 'invitee': invitee,
+      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
     };
     return await _sendContent(
       EventTypes.CallInvite,
@@ -1574,7 +1661,11 @@ class Room {
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> sendCallNegotiate(
       String callId, int lifetime, String party_id, String sdp,
-      {String type = 'offer', int version = 1, String txid}) async {
+      {String type = 'offer',
+      int version = 1,
+      String txid,
+      CallCapabilities capabilities,
+      SDPStreamMetadata metadata}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
@@ -1582,6 +1673,8 @@ class Room {
       'version': version,
       'lifetime': lifetime,
       'description': {'sdp': sdp, 'type': type},
+      if (capabilities != null) 'capabilities': capabilities.toMap(),
+      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
     };
     return await _sendContent(
       EventTypes.CallNegotiate,
@@ -1638,13 +1731,19 @@ class Room {
   /// [sdp] The SDP text of the session description.
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> answerCall(String callId, String sdp, String party_id,
-      {String type = 'answer', int version = 1, String txid}) async {
+      {String type = 'answer',
+      int version = 1,
+      String txid,
+      CallCapabilities capabilities,
+      SDPStreamMetadata metadata}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      'answer': {'sdp': sdp, 'type': type}
+      'answer': {'sdp': sdp, 'type': type},
+      if (capabilities != null) 'capabilities': capabilities.toMap(),
+      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
     };
     return await _sendContent(
       EventTypes.CallAnswer,
@@ -1669,6 +1768,53 @@ class Room {
     };
     return await _sendContent(
       EventTypes.CallHangup,
+      content,
+      txid: txid,
+    );
+  }
+
+  /// MSC3291: Muting in VoIP calls
+  ///
+  /// This MSC also adds a new call event m.call.sdp_stream_metadata_changed,
+  /// which has the common VoIP fields as specified in
+  /// MSC2746 (version, call_id, party_id) and a sdp_stream_metadata object which
+  /// is the same thing as sdp_stream_metadata in m.call.negotiate, m.call.invite
+  /// and m.call.answer. The client sends this event the when sdp_stream_metadata
+  /// has changed but no negotiation is required
+  ///  (e.g. the user mutes their camera/microphone).
+  ///
+  /// https://github.com/SimonBrandner/matrix-doc/blob/msc/muting/proposals/3291-muting.md
+  ///
+  Future<String> sendSDPStreamMetadataChanged(
+      String callId, String party_id, SDPStreamMetadata metadata,
+      {String type = 'answer', int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+    final content = {
+      'call_id': callId,
+      'party_id': party_id,
+      'version': version,
+      sdpStreamMetadataKey: metadata.toMap(),
+    };
+    return await _sendContent(
+      EventTypes.CallSDPStreamMetadataChangedPrefix,
+      content,
+      txid: txid,
+    );
+  }
+
+  /// CallReplacesEvent for Transfered calls
+  Future<String> sendCallReplaces(
+      String callId, String party_id, CallReplacesEvent callReplaces,
+      {String type = 'answer', int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+    final content = {
+      'call_id': callId,
+      'party_id': party_id,
+      'version': version,
+      ...callReplaces.toMap(),
+    };
+    return await _sendContent(
+      EventTypes.CallReplaces,
       content,
       txid: txid,
     );
