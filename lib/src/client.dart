@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2019, 2020, 2021 Famedly GmbH
@@ -185,6 +186,9 @@ class Client extends MatrixApi {
       EventTypes.Encryption,
       EventTypes.RoomCanonicalAlias,
       EventTypes.RoomTombstone,
+      EventTypes.spaceChild,
+      EventTypes.spaceParent,
+      EventTypes.RoomCreate,
     ]);
     roomPreviewLastEvents ??= {};
     roomPreviewLastEvents.addAll([

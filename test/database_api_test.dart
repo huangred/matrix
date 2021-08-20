@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2019, 2020 Famedly GmbH
@@ -16,19 +17,16 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:matrix/matrix.dart';
-import 'package:moor/moor.dart';
 import 'package:test/test.dart';
 import 'package:olm/olm.dart' as olm;
 
-import 'fake_database_native.dart';
+import 'fake_database.dart';
 
 void main() {
   /// All Tests related to the ChatTime
-  group('Moor Database Test', () {
-    testDatabase(getMoorDatabase(null), 0);
-  });
   group('Hive Database Test', () {
     testDatabase(getHiveDatabase(null), 0);
   });

@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2019, 2020, 2021 Famedly GmbH
@@ -27,6 +28,7 @@ import 'utils/matrix_localizations.dart';
 import 'utils/receipt.dart';
 import 'utils/event_localizations.dart';
 import 'utils/crypto/encrypted_file.dart';
+import 'utils/html_to_text.dart';
 
 abstract class RelationshipTypes {
   static const String reply = 'm.in_reply_to';
@@ -285,6 +287,12 @@ class Event extends MatrixEvent {
     if (formattedText != '') return formattedText;
     return '$type';
   }
+
+  /// Use this to get a plain-text representation of the event, stripping things
+  /// like spoilers and thelike. Useful for plain text notifications.
+  String get plaintextBody => content['format'] == 'org.matrix.custom.html'
+      ? HtmlToText.convert(formattedText)
+      : body;
 
   /// Returns a list of [Receipt] instances for this event.
   List<Receipt> get receipts {
@@ -563,8 +571,12 @@ class Event extends MatrixEvent {
   /// Returns a localized String representation of this event. For a
   /// room list you may find [withSenderNamePrefix] useful. Set [hideReply] to
   /// crop all lines starting with '>'.
-  String getLocalizedBody(MatrixLocalizations i18n,
-      {bool withSenderNamePrefix = false, bool hideReply = false}) {
+  String getLocalizedBody(
+    MatrixLocalizations i18n, {
+    bool withSenderNamePrefix = false,
+    bool hideReply = false,
+    bool hideEdit = false,
+  }) {
     if (redacted) {
       return i18n.removedBy(redactedBecause.sender.calcDisplayname());
     }
@@ -573,11 +585,14 @@ class Event extends MatrixEvent {
     if (callback != null) {
       localizedBody = callback(this, i18n);
     }
-
     // Hide reply fallback
     if (hideReply) {
       localizedBody = localizedBody.replaceFirst(
           RegExp(r'^>( \*)? <[^>]+>[^\n\r]+\r?\n(> [^\n]*\r?\n)*\r?\n'), '');
+    }
+    // Hide edit fallback
+    if (hideEdit && relationshipType == RelationshipTypes.edit) {
+      localizedBody = content['m.new_content']['body'] ?? localizedBody;
     }
 
     // Add the sender name prefix

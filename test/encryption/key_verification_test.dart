@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2020 Famedly GmbH
@@ -127,6 +128,11 @@ void main() {
       await Future.delayed(Duration(milliseconds: 10));
       await sub.cancel();
       expect(req2 != null, true);
+
+      expect(
+          client2.encryption.keyVerificationManager
+              .getRequest(req2.transactionId),
+          req2);
 
       // send ready
       FakeMatrixApi.calledEndpoints.clear();

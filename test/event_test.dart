@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2019, 2020 Famedly GmbH
@@ -944,6 +945,20 @@ void main() {
       timeline.removeAggregatedEvent(event);
       expect(
           event.aggregatedEvents(timeline, RelationshipTypes.edit), <Event>{});
+    });
+    test('plaintextBody', () {
+      final event = Event.fromJson({
+        'type': EventTypes.Message,
+        'content': {
+          'body': 'blah',
+          'msgtype': 'm.text',
+          'format': 'org.matrix.custom.html',
+          'formatted_body': '<b>blah</b>',
+        },
+        'event_id': '\$source',
+        'sender': '@alice:example.org',
+      }, null);
+      expect(event.plaintextBody, '**blah**');
     });
     test('getDisplayEvent', () {
       var event = Event.fromJson({

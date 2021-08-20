@@ -1,3 +1,4 @@
+// @dart=2.9
 /*
  *   Famedly Matrix SDK
  *   Copyright (C) 2020, 2021 Famedly GmbH
@@ -51,6 +52,8 @@ class KeyVerificationManager {
     }
     _requests[request.transactionId] = request;
   }
+
+  KeyVerification getRequest(String requestId) => _requests[requestId];
 
   Future<void> handleToDeviceEvent(ToDeviceEvent event) async {
     if (!event.type.startsWith('m.key.verification.') ||
