@@ -52,22 +52,6 @@ const Map<HistoryVisibility, String> _historyVisibilityMap = {
   HistoryVisibility.worldReadable: 'world_readable',
 };
 
-// TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
-const String sdpStreamMetadataKey = 'org.matrix.msc3077.sdp_stream_metadata';
-
-/// m.call.negotiate
-/// m.call.answer
-class CallCapabilities {
-  bool transferee;
-  bool dtmf;
-  Map<String, dynamic> toMap() {
-    return {
-      if (transferee != null) 'm.call.transferee': transferee,
-      if (dtmf != null) 'm.call.dtmf': dtmf,
-    };
-  }
-}
-
 class CallReplacesTarget {
   String id;
   String display_name;
@@ -81,6 +65,8 @@ class CallReplacesTarget {
   }
 }
 
+/// MSC2747: VoIP call transfers
+/// https://github.com/matrix-org/matrix-doc/pull/2747
 class CallReplacesEvent {
   String replacement_id;
   CallReplacesTarget target_user;
@@ -98,18 +84,32 @@ class CallReplacesEvent {
   }
 }
 
-class SDPStreamMetadataPurpose {
-  static String Usermedia = 'm.usermedia';
-  static String Screenshare = 'm.screenshare';
+// TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
+const String sdpStreamMetadataKey = 'org.matrix.msc3077.sdp_stream_metadata';
+
+/// https://github.com/matrix-org/matrix-doc/blob/dbkr/msc2747/proposals/2747-voip-call-transfer.md#capability-advertisment
+/// https://github.com/matrix-org/matrix-doc/blob/dbkr/msc2746/proposals/2746-reliable-voip.md#add-dtmf
+class CallCapabilities {
+  bool transferee;
+  bool dtmf;
+  Map<String, dynamic> toMap() {
+    return {
+      if (transferee != null) 'm.call.transferee': transferee,
+      if (dtmf != null) 'm.call.dtmf': dtmf,
+    };
+  }
 }
 
-/*
-This MSC proposes adding an sdp_stream_metadata field 
-to the events containing a session description i.e.:
-m.call.invite
-m.call.answer
-m.call.negotiate
-*/
+/// MSC3077: Support for multi-stream VoIP
+/// https://github.com/matrix-org/matrix-doc/pull/3077
+///
+/// MSC3291: Muting in VoIP calls
+/// https://github.com/SimonBrandner/matrix-doc/blob/msc/muting/proposals/3291-muting.md
+///
+/// This MSC proposes adding an sdp_stream_metadata field
+/// to the events containing a session description i.e.:
+/// m.call.invite, m.call.answer, m.call.negotiate
+///
 class SDPStreamPurpose {
   // SDPStreamMetadataPurpose
   String purpose;
@@ -124,6 +124,11 @@ class SDPStreamPurpose {
   }
 }
 
+class SDPStreamMetadataPurpose {
+  static String Usermedia = 'm.usermedia';
+  static String Screenshare = 'm.screenshare';
+}
+
 class SDPStreamMetadata {
   Map<String, SDPStreamPurpose> sdpStreamMetadatas;
   SDPStreamMetadata(this.sdpStreamMetadatas);
@@ -131,6 +136,19 @@ class SDPStreamMetadata {
     return {
       sdpStreamMetadataKey:
           sdpStreamMetadatas.map((key, value) => MapEntry(key, value.toMap())),
+    };
+  }
+}
+
+/// MSC3086: Asserted identity on VoIP calls
+/// https://github.com/matrix-org/matrix-doc/pull/3086
+class AssertedIdentity {
+  String displayName;
+  String id;
+  Map<String, dynamic> toMap() {
+    return {
+      if (displayName != null) 'display_name': displayName,
+      if (id != null) 'id': id,
     };
   }
 }
@@ -1773,7 +1791,7 @@ class Room {
     );
   }
 
-  /// MSC3291: Muting in VoIP calls
+  /// Send SdpStreamMetadata Changed event.
   ///
   /// This MSC also adds a new call event m.call.sdp_stream_metadata_changed,
   /// which has the common VoIP fields as specified in
@@ -1783,11 +1801,13 @@ class Room {
   /// has changed but no negotiation is required
   ///  (e.g. the user mutes their camera/microphone).
   ///
-  /// https://github.com/SimonBrandner/matrix-doc/blob/msc/muting/proposals/3291-muting.md
-  ///
+  /// [callId] The ID of the call this event relates to.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  /// [metadata] The sdp_stream_metadata object.
   Future<String> sendSDPStreamMetadataChanged(
       String callId, String party_id, SDPStreamMetadata metadata,
-      {String type = 'answer', int version = 1, String txid}) async {
+      {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
@@ -1803,15 +1823,43 @@ class Room {
   }
 
   /// CallReplacesEvent for Transfered calls
+  ///
+  /// [callId] The ID of the call this event relates to.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  /// [callReplaces] transfer info
   Future<String> sendCallReplaces(
       String callId, String party_id, CallReplacesEvent callReplaces,
-      {String type = 'answer', int version = 1, String txid}) async {
+      {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
       ...callReplaces.toMap(),
+    };
+    return await _sendContent(
+      EventTypes.CallReplaces,
+      content,
+      txid: txid,
+    );
+  }
+
+  /// send AssertedIdentity event
+  ///
+  /// [callId] The ID of the call this event relates to.
+  /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
+  /// [party_id] The party ID for call, Can be set to client.deviceId.
+  /// [assertedIdentity] the asserted identity
+  Future<String> sendAssertedIdentity(
+      String callId, String party_id, AssertedIdentity assertedIdentity,
+      {int version = 1, String txid}) async {
+    txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
+    final content = {
+      'call_id': callId,
+      'party_id': party_id,
+      'version': version,
+      'asserted_identity': assertedIdentity.toMap(),
     };
     return await _sendContent(
       EventTypes.CallReplaces,
