@@ -51,36 +51,6 @@ const Map<HistoryVisibility, String> _historyVisibilityMap = {
   HistoryVisibility.worldReadable: 'world_readable',
 };
 
-enum HangupCause {
-  iceTimeout,
-  userHangup,
-  userMediaFailed,
-  userBusy,
-  unknownError,
-}
-
-const Map<HangupCause, String> _hangupCauseMap = {
-  HangupCause.iceTimeout: 'ice_timeout',
-  HangupCause.userHangup: 'user_hangup',
-  HangupCause.userMediaFailed: 'user_media_failed',
-  HangupCause.userBusy: 'user_busy',
-  HangupCause.unknownError: 'unknown_error',
-};
-
-abstract class ExtraEventTypes {
-  static const String CallSelectAnswer = 'm.call.select_answer';
-  static const String CallReject = 'm.call.reject';
-  static const String CallNegotiate = 'm.call.negotiate';
-  static const String CallSDPStreamMetadataChanged =
-      'm.call.sdp_stream_metadata_changed';
-  static const String CallSDPStreamMetadataChangedPrefix =
-      'org.matrix.call.sdp_stream_metadata_changed';
-  static const String CallReplaces = 'm.call.replaces';
-  static const String CallAssertedIdentity = 'm.call.asserted_identity';
-  static const String CallAssertedIdentityPrefix =
-      'org.matrix.call.asserted_identity';
-}
-
 const String messageSendingStatusKey =
     'com.famedly.famedlysdk.message_sending_status';
 
@@ -1533,7 +1503,7 @@ class Room {
       'version': version,
       'lifetime': lifetime,
       'offer': {'sdp': sdp, 'type': type},
-      if (invitee != null) 'invitee': invitee,
+      if (invitee != null) 'invitee': invitee
     };
     return await _sendContent(
       EventTypes.CallInvite,
@@ -1565,7 +1535,7 @@ class Room {
     };
 
     return await _sendContent(
-      ExtraEventTypes.CallSelectAnswer,
+      EventTypes.CallSelectAnswer,
       content,
       txid: txid,
     );
@@ -1587,7 +1557,7 @@ class Room {
     };
 
     return await _sendContent(
-      ExtraEventTypes.CallReject,
+      EventTypes.CallReject,
       content,
       txid: txid,
     );
@@ -1610,7 +1580,7 @@ class Room {
       'description': {'sdp': sdp, 'type': type},
     };
     return await _sendContent(
-      ExtraEventTypes.CallNegotiate,
+      EventTypes.CallNegotiate,
       content,
       txid: txid,
     );
@@ -1670,7 +1640,7 @@ class Room {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      'answer': {'sdp': sdp, 'type': type},
+      'answer': {'sdp': sdp, 'type': type}
     };
     return await _sendContent(
       EventTypes.CallAnswer,
@@ -1683,7 +1653,7 @@ class Room {
   /// [callId] The ID of the call this event relates to.
   /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
   /// [party_id] The party ID for call, Can be set to client.deviceId.
-  Future<String> hangupCall(String callId, String party_id, HangupCause cause,
+  Future<String> hangupCall(String callId, String party_id, String hangupCause,
       {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
@@ -1691,7 +1661,7 @@ class Room {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      if (cause != null) 'reason': _hangupCauseMap[cause],
+      if (hangupCause != null) 'reason': hangupCause,
     };
     return await _sendContent(
       EventTypes.CallHangup,
