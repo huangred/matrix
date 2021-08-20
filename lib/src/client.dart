@@ -1462,31 +1462,28 @@ class Client extends MatrixApi {
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallCandidates) {
           onCallCandidates
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
-        } else if (rawUnencryptedEvent['type'] ==
-            ExtraEventTypes.CallSelectAnswer) {
+        } else if (rawUnencryptedEvent['type'] == EventTypes.CallSelectAnswer) {
           onCallSelectAnswer
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
-        } else if (rawUnencryptedEvent['type'] == ExtraEventTypes.CallReject) {
+        } else if (rawUnencryptedEvent['type'] == EventTypes.CallReject) {
           onCallReject
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
-        } else if (rawUnencryptedEvent['type'] ==
-            ExtraEventTypes.CallNegotiate) {
+        } else if (rawUnencryptedEvent['type'] == EventTypes.CallNegotiate) {
           onCallNegotiate
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
-        } else if (rawUnencryptedEvent['type'] ==
-            ExtraEventTypes.CallReplaces) {
+        } else if (rawUnencryptedEvent['type'] == EventTypes.CallReplaces) {
           onCallReplaces
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
         } else if (rawUnencryptedEvent['type'] ==
-                ExtraEventTypes.CallAssertedIdentity ||
+                EventTypes.CallAssertedIdentity ||
             rawUnencryptedEvent['type'] ==
-                ExtraEventTypes.CallAssertedIdentityPrefix) {
+                EventTypes.CallAssertedIdentityPrefix) {
           onAssertedIdentityReceived
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
         } else if (rawUnencryptedEvent['type'] ==
-                ExtraEventTypes.CallSDPStreamMetadataChanged ||
+                EventTypes.CallSDPStreamMetadataChanged ||
             rawUnencryptedEvent['type'] ==
-                ExtraEventTypes.CallSDPStreamMetadataChangedPrefix) {
+                EventTypes.CallSDPStreamMetadataChangedPrefix) {
           onSDPStreamMetadataChangedReceived
               .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
         }

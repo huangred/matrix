@@ -605,8 +605,7 @@ void main() {
       await room.selectCallAnswer('1234', 1234, '4567', '6789', txid: '1234');
       await room.sendCallReject('1234', 1234, '4567', txid: '1234');
       await room.sendCallNegotiate('1234', 1234, '4567', 'sdp', txid: '1234');
-      await room.hangupCall('1234', '4567', HangupCause.userHangup,
-          txid: '1234');
+      await room.hangupCall('1234', '4567', 'user_hangup', txid: '1234');
     });
 
     test('enableEncryption', () async {
