@@ -56,7 +56,7 @@ class CallReplacesTarget {
   String id;
   String display_name;
   String avatar_url;
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
       if (display_name != null) 'display_name': display_name,
@@ -73,10 +73,10 @@ class CallReplacesEvent {
   String create_call;
   String await_call;
   String target_room;
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'replacement_id': replacement_id,
-      'target_user': target_user.toMap(),
+      'target_user': target_user.toJson(),
       if (create_call != null) 'create_call': create_call,
       if (await_call != null) 'await_call': await_call,
       'target_room': target_room,
@@ -92,7 +92,7 @@ const String sdpStreamMetadataKey = 'org.matrix.msc3077.sdp_stream_metadata';
 class CallCapabilities {
   bool transferee;
   bool dtmf;
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       if (transferee != null) 'm.call.transferee': transferee,
       if (dtmf != null) 'm.call.dtmf': dtmf,
@@ -115,7 +115,7 @@ class SDPStreamPurpose {
   String purpose;
   bool audio_muted;
   bool video_muted;
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'purpose': purpose,
       if (audio_muted != null) 'audio_muted': audio_muted,
@@ -132,10 +132,10 @@ class SDPStreamMetadataPurpose {
 class SDPStreamMetadata {
   Map<String, SDPStreamPurpose> sdpStreamMetadatas;
   SDPStreamMetadata(this.sdpStreamMetadatas);
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       sdpStreamMetadataKey:
-          sdpStreamMetadatas.map((key, value) => MapEntry(key, value.toMap())),
+          sdpStreamMetadatas.map((key, value) => MapEntry(key, value.toJson())),
     };
   }
 }
@@ -145,7 +145,7 @@ class SDPStreamMetadata {
 class AssertedIdentity {
   String displayName;
   String id;
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       if (displayName != null) 'display_name': displayName,
       if (id != null) 'id': id,
@@ -1602,6 +1602,7 @@ class Room {
       {String type = 'offer',
       int version = 1,
       String txid,
+      CallCapabilities capabilities,
       SDPStreamMetadata metadata}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
@@ -1612,7 +1613,8 @@ class Room {
       'lifetime': lifetime,
       'offer': {'sdp': sdp, 'type': type},
       if (invitee != null) 'invitee': invitee,
-      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
+      if (capabilities != null) 'capabilities': capabilities.toJson(),
+      if (metadata != null) sdpStreamMetadataKey: metadata.toJson(),
     };
     return await _sendContent(
       EventTypes.CallInvite,
@@ -1691,8 +1693,8 @@ class Room {
       'version': version,
       'lifetime': lifetime,
       'description': {'sdp': sdp, 'type': type},
-      if (capabilities != null) 'capabilities': capabilities.toMap(),
-      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
+      if (capabilities != null) 'capabilities': capabilities.toJson(),
+      if (metadata != null) sdpStreamMetadataKey: metadata.toJson(),
     };
     return await _sendContent(
       EventTypes.CallNegotiate,
@@ -1760,8 +1762,8 @@ class Room {
       'party_id': party_id,
       'version': version,
       'answer': {'sdp': sdp, 'type': type},
-      if (capabilities != null) 'capabilities': capabilities.toMap(),
-      if (metadata != null) sdpStreamMetadataKey: metadata.toMap(),
+      if (capabilities != null) 'capabilities': capabilities.toJson(),
+      if (metadata != null) sdpStreamMetadataKey: metadata.toJson(),
     };
     return await _sendContent(
       EventTypes.CallAnswer,
@@ -1813,7 +1815,7 @@ class Room {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      sdpStreamMetadataKey: metadata.toMap(),
+      sdpStreamMetadataKey: metadata.toJson(),
     };
     return await _sendContent(
       EventTypes.CallSDPStreamMetadataChangedPrefix,
@@ -1836,7 +1838,7 @@ class Room {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      ...callReplaces.toMap(),
+      ...callReplaces.toJson(),
     };
     return await _sendContent(
       EventTypes.CallReplaces,
@@ -1859,7 +1861,7 @@ class Room {
       'call_id': callId,
       'party_id': party_id,
       'version': version,
-      'asserted_identity': assertedIdentity.toMap(),
+      'asserted_identity': assertedIdentity.toJson(),
     };
     return await _sendContent(
       EventTypes.CallReplaces,
