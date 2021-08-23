@@ -67,7 +67,7 @@ class CallReplacesTarget {
 
 /// MSC2747: VoIP call transfers
 /// https://github.com/matrix-org/matrix-doc/pull/2747
-class CallReplacesEvent {
+class CallReplaces {
   String replacement_id;
   CallReplacesTarget target_user;
   String create_call;
@@ -1831,7 +1831,7 @@ class Room {
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   /// [callReplaces] transfer info
   Future<String> sendCallReplaces(
-      String callId, String party_id, CallReplacesEvent callReplaces,
+      String callId, String party_id, CallReplaces callReplaces,
       {int version = 1, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {

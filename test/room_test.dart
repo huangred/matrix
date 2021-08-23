@@ -606,6 +606,15 @@ void main() {
       await room.sendCallReject('1234', 1234, '4567', txid: '1234');
       await room.sendCallNegotiate('1234', 1234, '4567', 'sdp', txid: '1234');
       await room.hangupCall('1234', '4567', 'user_hangup', txid: '1234');
+      await room.sendAssertedIdentity(
+          '1234',
+          '4567',
+          AssertedIdentity()
+            ..displayName = 'name'
+            ..id = 'some_id',
+          txid: '1234');
+      await room
+        ..sendCallReplaces('1234', '4567', CallReplaces(), txid: '1234');
     });
 
     test('enableEncryption', () async {
