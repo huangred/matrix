@@ -75,11 +75,11 @@ class CallReplaces {
   String target_room;
   Map<String, dynamic> toJson() {
     return {
-      'replacement_id': replacement_id,
-      'target_user': target_user.toJson(),
+      if (replacement_id != null) 'replacement_id': replacement_id,
+      if (target_user != null) 'target_user': target_user.toJson(),
       if (create_call != null) 'create_call': create_call,
       if (await_call != null) 'await_call': await_call,
-      'target_room': target_room,
+      if (target_room != null) 'target_room': target_room,
     };
   }
 }
@@ -1864,7 +1864,7 @@ class Room {
       'asserted_identity': assertedIdentity.toJson(),
     };
     return await _sendContent(
-      EventTypes.CallReplaces,
+      EventTypes.CallAssertedIdentity,
       content,
       txid: txid,
     );

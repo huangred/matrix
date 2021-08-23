@@ -613,8 +613,10 @@ void main() {
             ..displayName = 'name'
             ..id = 'some_id',
           txid: '1234');
-      await room
-        ..sendCallReplaces('1234', '4567', CallReplaces(), txid: '1234');
+      await room.sendCallReplaces('1234', '4567', CallReplaces(), txid: '1234');
+      await room.sendSDPStreamMetadataChanged(
+          '1234', '4567', SDPStreamMetadata({}),
+          txid: '1234');
     });
 
     test('enableEncryption', () async {
