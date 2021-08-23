@@ -731,7 +731,7 @@ class Room {
   /// the message event has received the server. Otherwise the future will only
   /// wait until the file has been uploaded.
   /// Optionally specify [extraContent] to tack on to the event.
-  Future<String> sendFileEvent(
+  Future<Uri> sendFileEvent(
     MatrixFile file, {
     String txid,
     Event inReplyTo,
@@ -771,10 +771,10 @@ class Room {
       'msgtype': file.msgType,
       'body': file.name,
       'filename': file.name,
-      if (encryptedFile == null) 'url': uploadResp,
+      if (encryptedFile == null) 'url': uploadResp.toString(),
       if (encryptedFile != null)
         'file': {
-          'url': uploadResp,
+          'url': uploadResp.toString(),
           'mimetype': file.mimeType,
           'v': 'v2',
           'key': {
@@ -793,7 +793,7 @@ class Room {
           'thumbnail_url': thumbnailUploadResp,
         if (thumbnail != null && encryptedThumbnail != null)
           'thumbnail_file': {
-            'url': thumbnailUploadResp,
+            'url': thumbnailUploadResp.toString(),
             'mimetype': thumbnail.mimeType,
             'v': 'v2',
             'key': {
@@ -1423,7 +1423,7 @@ class Room {
       id,
       EventTypes.RoomAvatar,
       '',
-      {'url': uploadResp},
+      {'url': uploadResp.toString()},
     );
   }
 
