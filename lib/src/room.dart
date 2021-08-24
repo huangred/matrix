@@ -56,6 +56,13 @@ class CallReplacesTarget {
   String id;
   String display_name;
   String avatar_url;
+  CallReplacesTarget();
+  factory CallReplacesTarget.fromJson(Map<String, dynamic> json) {
+    return CallReplacesTarget()
+      ..id = json['id'].toString()
+      ..display_name = json['display_name'].toString()
+      ..avatar_url = json['avatar_url'].toString();
+  }
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
@@ -73,6 +80,16 @@ class CallReplaces {
   String create_call;
   String await_call;
   String target_room;
+  CallReplaces();
+  factory CallReplaces.fromJson(Map<String, dynamic> json) {
+    return CallReplaces()
+      ..replacement_id = json['replacement_id'].toString()
+      ..create_call = json['create_call'].toString()
+      ..await_call = json['await_call'].toString()
+      ..target_room = json['target_room'].toString()
+      ..target_user = CallReplacesTarget.fromJson(json['target_user']);
+  }
+
   Map<String, dynamic> toJson() {
     return {
       if (replacement_id != null) 'replacement_id': replacement_id,
@@ -92,6 +109,12 @@ const String sdpStreamMetadataKey = 'org.matrix.msc3077.sdp_stream_metadata';
 class CallCapabilities {
   bool transferee;
   bool dtmf;
+  CallCapabilities();
+  factory CallCapabilities.fromJson(Map<String, dynamic> json) {
+    return CallCapabilities()
+      ..dtmf = json['dtmf'] as bool ?? false
+      ..transferee = json['transferee'] as bool ?? false;
+  }
   Map<String, dynamic> toJson() {
     return {
       if (transferee != null) 'm.call.transferee': transferee,
@@ -115,6 +138,13 @@ class SDPStreamPurpose {
   String purpose;
   bool audio_muted;
   bool video_muted;
+  SDPStreamPurpose();
+  factory SDPStreamPurpose.fromJson(Map<String, dynamic> json) {
+    return SDPStreamPurpose()
+      ..audio_muted = json['audio_muted'] as bool ?? false
+      ..video_muted = json['video_muted'] as bool ?? false
+      ..purpose = json['purpose'] as String;
+  }
   Map<String, dynamic> toJson() {
     return {
       'purpose': purpose,
@@ -132,6 +162,10 @@ class SDPStreamMetadataPurpose {
 class SDPStreamMetadata {
   Map<String, SDPStreamPurpose> sdpStreamMetadatas;
   SDPStreamMetadata(this.sdpStreamMetadatas);
+  factory SDPStreamMetadata.fromJson(Map<String, dynamic> json) {
+    return SDPStreamMetadata(json
+        .map((key, value) => MapEntry(key, SDPStreamPurpose.fromJson(value))));
+  }
   Map<String, dynamic> toJson() {
     return {
       sdpStreamMetadataKey:
@@ -145,6 +179,12 @@ class SDPStreamMetadata {
 class AssertedIdentity {
   String displayName;
   String id;
+  AssertedIdentity();
+  factory AssertedIdentity.fromJson(Map<String, dynamic> json) {
+    return AssertedIdentity()
+      ..displayName = json['display_name'] as String
+      ..id = json['id'] as String;
+  }
   Map<String, dynamic> toJson() {
     return {
       if (displayName != null) 'display_name': displayName,
