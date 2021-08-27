@@ -167,10 +167,8 @@ class SDPStreamMetadata {
         .map((key, value) => MapEntry(key, SDPStreamPurpose.fromJson(value))));
   }
   Map<String, dynamic> toJson() {
-    return {
-      sdpStreamMetadataKey:
-          sdpStreamMetadatas.map((key, value) => MapEntry(key, value.toJson())),
-    };
+    return sdpStreamMetadatas
+        .map((key, value) => MapEntry(key, value.toJson()));
   }
 }
 
