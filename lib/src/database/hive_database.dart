@@ -851,8 +851,25 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
           eventUpdate.content['type'],
         ).toString();
         final Map stateMap = await _roomStateBox.get(key) ?? {};
-        stateMap[eventUpdate.content['state_key']] = eventUpdate.content;
-        await _roomStateBox.put(key, stateMap);
+        // store state events and new messages, that either are not an edit or an edit of the lastest message
+        // An edit is an event, that has an edit relation to the latest event. In some cases for the second edit, we need to compare if both have an edit relation to the same event instead.
+        if (!eventUpdate.content['content'].containsKey('m.relates_to')) {
+          stateMap[eventUpdate.content['state_key']] = eventUpdate.content;
+          await _roomStateBox.put(key, stateMap);
+        } else {
+          final String editedEventRelationshipEventId =
+              eventUpdate.content['content']['m.relates_to']['event_id'];
+          if (eventUpdate.content['type'] != EventTypes.Message ||
+              eventUpdate.content['content']['m.relates_to']['rel_type'] !=
+                  RelationshipTypes.edit ||
+              editedEventRelationshipEventId == stateMap['']?.eventId ||
+              ((stateMap['']?.relationshipType == RelationshipTypes.edit &&
+                  editedEventRelationshipEventId ==
+                      stateMap['']?.relationshipEventId))) {
+            stateMap[eventUpdate.content['state_key']] = eventUpdate.content;
+            await _roomStateBox.put(key, stateMap);
+          }
+        }
       }
     }
 

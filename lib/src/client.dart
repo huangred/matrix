@@ -1591,7 +1591,14 @@ sort order of ${prevState.sortOrder}. This should never happen...''');
             ),
           );
         } else {
-          room.setState(stateEvent);
+          if (stateEvent.type != EventTypes.Message ||
+              stateEvent.relationshipType != RelationshipTypes.edit ||
+              stateEvent.relationshipEventId == room.lastEvent.eventId ||
+              ((room.lastEvent.relationshipType == RelationshipTypes.edit &&
+                  stateEvent.relationshipEventId ==
+                      room.lastEvent.relationshipEventId))) {
+            room.setState(stateEvent);
+          }
         }
         break;
       case EventUpdateType.accountData:
