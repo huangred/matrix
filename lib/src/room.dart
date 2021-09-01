@@ -511,7 +511,7 @@ class Room {
     this.membership = Membership.join,
     int notificationCount,
     int highlightCount,
-    String prev_batch,
+    this.prev_batch,
     this.client,
     this.notificationSettings,
     Map<String, BasicRoomEvent> roomAccountData,
@@ -522,7 +522,6 @@ class Room {
         _oldestSortOrder = oldestSortOrder,
         notificationCount = notificationCount ?? 0,
         highlightCount = highlightCount ?? 0,
-        prev_batch = prev_batch ?? '',
         roomAccountData = roomAccountData ?? <String, BasicRoomEvent>{},
         summary = summary ??
             RoomSummary.fromJson({
@@ -705,6 +704,12 @@ class Room {
   Map<String, Map<String, String>> get emotePacks =>
       getImagePacksFlat(ImagePackUsage.emoticon);
 
+  /// returns the resolved mxid for a mention string, or null if none found
+  String getMention(String mention) => getParticipants()
+      .firstWhere((u) => u.mentionFragments.contains(mention),
+          orElse: () => null)
+      ?.id;
+
   /// Sends a normal text message to this room. Returns the event ID generated
   /// by the server for this message.
   Future<String> sendTextEvent(String message,
@@ -724,12 +729,9 @@ class Room {
       'body': message,
     };
     if (parseMarkdown) {
-      final mentionMap = <String, String>{
-        for (final user in getParticipants()) user.mention: user.id
-      };
       final html = markdown(event['body'],
-          emotePacks: getImagePacksFlat(ImagePackUsage.emoticon),
-          mentionMap: mentionMap);
+          getEmotePacks: () => getImagePacksFlat(ImagePackUsage.emoticon),
+          getMention: getMention);
       // if the decoded html is the same as the body, there is no need in sending a formatted message
       if (HtmlUnescape().convert(html.replaceAll(RegExp(r'<br />\n?'), '\n')) !=
           event['body']) {
@@ -828,7 +830,7 @@ class Room {
       'info': {
         ...file.info,
         if (thumbnail != null && encryptedThumbnail == null)
-          'thumbnail_url': thumbnailUploadResp,
+          'thumbnail_url': thumbnailUploadResp.toString(),
         if (thumbnail != null && encryptedThumbnail != null)
           'thumbnail_file': {
             'url': thumbnailUploadResp.toString(),
@@ -1081,6 +1083,9 @@ class Room {
   /// the historical events will be published in the onEvent stream.
   Future<void> requestHistory(
       {int historyCount = defaultHistoryCount, onHistoryReceived}) async {
+    if (prev_batch == null) {
+      throw 'Tried to request history without a prev_batch token';
+    }
     final resp = await client.getRoomEvents(
       id,
       prev_batch,
@@ -1241,7 +1246,6 @@ class Room {
       onInsert: onInsert,
     );
     if (client.database == null) {
-      prev_batch = '';
       await requestHistory(historyCount: 10);
     }
     return timeline;
