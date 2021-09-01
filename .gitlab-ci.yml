@@ -119,8 +119,6 @@ dry-run:
   script:
     - dart pub get
     - dart pub publish --dry-run
-  only:
-    - merge_requests
 
 pub-dev:
   stage: publish
@@ -158,5 +156,5 @@ pub-dev:
       EOF
     - dart pub get
     - dart pub publish
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_TAG
