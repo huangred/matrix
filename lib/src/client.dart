@@ -160,6 +160,7 @@ class Client extends MatrixApi {
     this.importantStateEvents,
     this.roomPreviewLastEvents,
     this.pinUnreadRooms = false,
+    this.pinInvitedRooms = true,
     this.sendMessageTimeoutSeconds = 60,
     this.requestHistoryOnLimitedTimeline = false,
     this.supportedLoginTypes,
@@ -677,7 +678,6 @@ class Client extends MatrixApi {
             leftRoom.setState(Event.fromMatrixEvent(
               event,
               leftRoom,
-              sortOrder: event.originServerTs.millisecondsSinceEpoch.toDouble(),
             ));
           }
         }
@@ -686,7 +686,6 @@ class Client extends MatrixApi {
             leftRoom.setState(Event.fromMatrixEvent(
               event,
               leftRoom,
-              sortOrder: event.originServerTs.millisecondsSinceEpoch.toDouble(),
             ));
           }
         }
@@ -1284,13 +1283,7 @@ class Client extends MatrixApi {
         await database.storeRoomUpdate(this.id, update, getRoomById(id));
       }
       _updateRoomsByRoomUpdate(update);
-      final roomObj = getRoomById(id);
-      if (update.limitedTimeline && roomObj != null) {
-        roomObj.resetSortOrder();
-      }
       onRoomUpdate.add(update);
-
-      var handledEvents = false;
 
       /// Handle now all room events and save them in the database
       if (room is JoinedRoomUpdate) {
@@ -1299,7 +1292,6 @@ class Client extends MatrixApi {
           await _handleRoomEvents(id,
               room.state.map((i) => i.toJson()).toList(), EventUpdateType.state,
               sortAtTheEnd: sortAtTheEnd);
-          handledEvents = true;
         }
         if (room.timeline?.events?.isNotEmpty ?? false) {
           await _handleRoomEvents(
@@ -1307,7 +1299,6 @@ class Client extends MatrixApi {
               room.timeline.events.map((i) => i.toJson()).toList(),
               sortAtTheEnd ? EventUpdateType.history : EventUpdateType.timeline,
               sortAtTheEnd: sortAtTheEnd);
-          handledEvents = true;
         }
         if (room.ephemeral?.isNotEmpty ?? false) {
           // TODO: This method seems to be comperatively slow for some updates
@@ -1328,7 +1319,6 @@ class Client extends MatrixApi {
               room.timeline.events.map((i) => i.toJson()).toList(),
               EventUpdateType.timeline,
               sortAtTheEnd: sortAtTheEnd);
-          handledEvents = true;
         }
         if (room.accountData?.isNotEmpty ?? false) {
           await _handleRoomEvents(
@@ -1341,7 +1331,6 @@ class Client extends MatrixApi {
               id,
               room.state.map((i) => i.toJson()).toList(),
               EventUpdateType.state);
-          handledEvents = true;
         }
       }
       if (room is InvitedRoomUpdate &&
@@ -1350,9 +1339,6 @@ class Client extends MatrixApi {
             id,
             room.inviteState.map((i) => i.toJson()).toList(),
             EventUpdateType.inviteState);
-      }
-      if (handledEvents && database != null && roomObj != null) {
-        await roomObj.updateSortOrder();
       }
     }
   }
@@ -1424,16 +1410,10 @@ class Client extends MatrixApi {
         return;
       }
 
-      // ephemeral events aren't persisted and don't need a sort order - they are
-      // expected to be processed as soon as they come in
-      final sortOrder = type != EventUpdateType.ephemeral
-          ? (sortAtTheEnd ? room.oldSortOrder : room.newSortOrder)
-          : 0.0;
       var update = EventUpdate(
         roomID: roomID,
         type: type,
         content: event,
-        sortOrder: sortOrder,
       );
       if (event['type'] == EventTypes.Encrypted && encryptionEnabled) {
         update = await update.decrypt(room);
@@ -1461,41 +1441,33 @@ class Client extends MatrixApi {
 
       if (prevBatch != null && type == EventUpdateType.timeline) {
         if (rawUnencryptedEvent['type'] == EventTypes.CallInvite) {
-          onCallInvite
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallInvite.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallHangup) {
-          onCallHangup
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallHangup.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallAnswer) {
-          onCallAnswer
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallAnswer.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallCandidates) {
-          onCallCandidates
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallCandidates.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallSelectAnswer) {
-          onCallSelectAnswer
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallSelectAnswer.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallReject) {
-          onCallReject
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallReject.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallNegotiate) {
-          onCallNegotiate
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallNegotiate.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] == EventTypes.CallReplaces) {
-          onCallReplaces
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+          onCallReplaces.add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] ==
                 EventTypes.CallAssertedIdentity ||
             rawUnencryptedEvent['type'] ==
                 EventTypes.CallAssertedIdentityPrefix) {
           onAssertedIdentityReceived
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+              .add(Event.fromJson(rawUnencryptedEvent, room));
         } else if (rawUnencryptedEvent['type'] ==
                 EventTypes.CallSDPStreamMetadataChanged ||
             rawUnencryptedEvent['type'] ==
                 EventTypes.CallSDPStreamMetadataChangedPrefix) {
           onSDPStreamMetadataChangedReceived
-              .add(Event.fromJson(rawUnencryptedEvent, room, sortOrder));
+              .add(Event.fromJson(rawUnencryptedEvent, room));
         }
       }
     }
@@ -1537,7 +1509,8 @@ class Client extends MatrixApi {
         (rooms[j].membership != chatUpdate.membership ||
             rooms[j].notificationCount != chatUpdate.notification_count ||
             rooms[j].highlightCount != chatUpdate.highlight_count ||
-            chatUpdate.summary != null)) {
+            chatUpdate.summary != null ||
+            chatUpdate.prev_batch != null)) {
       rooms[j].membership = chatUpdate.membership;
       rooms[j].notificationCount = chatUpdate.notification_count;
       rooms[j].highlightCount = chatUpdate.highlight_count;
@@ -1567,18 +1540,7 @@ class Client extends MatrixApi {
       case EventUpdateType.timeline:
       case EventUpdateType.state:
       case EventUpdateType.inviteState:
-        final stateEvent =
-            Event.fromJson(eventUpdate.content, room, eventUpdate.sortOrder);
-        final prevState = room.getState(stateEvent.type, stateEvent.stateKey);
-        if (eventUpdate.type == EventUpdateType.timeline &&
-            prevState != null &&
-            prevState.sortOrder > stateEvent.sortOrder) {
-          Logs().w('''
-A new ${eventUpdate.type} event of the type ${stateEvent.type} has arrived with a previews
-sort order ${stateEvent.sortOrder} than the current ${stateEvent.type} event with a
-sort order of ${prevState.sortOrder}. This should never happen...''');
-          return;
-        }
+        final stateEvent = Event.fromJson(eventUpdate.content, room);
         if (stateEvent.type == EventTypes.Redaction) {
           final String redacts = eventUpdate.content['redacts'];
           room.states.forEach(
@@ -1619,6 +1581,9 @@ sort order of ${prevState.sortOrder}. This should never happen...''');
 
   /// If `true` then unread rooms are pinned at the top of the room list.
   bool pinUnreadRooms;
+
+  /// If `true` then unread rooms are pinned at the top of the room list.
+  bool pinInvitedRooms;
 
   /// The compare function how the rooms should be sorted internally. By default
   /// rooms are sorted by timestamp of the last m.room.message event or the last

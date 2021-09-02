@@ -235,9 +235,6 @@ class Room {
   /// Key-Value store for private account data only visible for this user.
   Map<String, BasicRoomEvent> roomAccountData = {};
 
-  double _newestSortOrder;
-  double _oldestSortOrder;
-
   Map<String, dynamic> toJson() => {
         'id': id,
         'membership': membership.toString().split('.').last,
@@ -264,29 +261,6 @@ class Room {
         newestSortOrder: json['newest_sort_order'].toDouble(),
         oldestSortOrder: json['oldest_sort_order'].toDouble(),
       );
-
-  double get newSortOrder {
-    var now = DateTime.now().millisecondsSinceEpoch.toDouble();
-    if (_newestSortOrder >= now) {
-      now = _newestSortOrder + 1;
-    }
-    _newestSortOrder = now;
-    return _newestSortOrder;
-  }
-
-  double get oldSortOrder {
-    _oldestSortOrder--;
-    return _oldestSortOrder;
-  }
-
-  void resetSortOrder() {
-    _oldestSortOrder = _newestSortOrder = 0.0;
-  }
-
-  Future<void> updateSortOrder() async {
-    await client.database?.updateRoomSortOrder(
-        _oldestSortOrder, _newestSortOrder, client.id, id);
-  }
 
   /// Flag if the room is partial, meaning not all state events have been loaded yet
   bool partial = true;
@@ -324,20 +298,33 @@ class Room {
         Logs().e('[LibOlm] Could not decrypt room state', e, s);
       }
     }
-    if (!(state.stateKey is String) &&
-            ![EventTypes.Message, EventTypes.Sticker, EventTypes.Encrypted]
-                .contains(state.type) ||
-        (state.type == EventTypes.Message &&
-            state.messageType.startsWith('m.room.verification.'))) {
+
+    // We ignore room verification events for lastEvents
+    if (state.type == EventTypes.Message &&
+        state.messageType.startsWith('m.room.verification.')) {
       return;
     }
-    final oldStateEvent = getState(state.type, state.stateKey ?? '');
-    if (oldStateEvent != null && oldStateEvent.sortOrder >= state.sortOrder) {
+
+    final isMessageEvent = [
+      EventTypes.Message,
+      EventTypes.Sticker,
+      EventTypes.Encrypted,
+    ].contains(state.type);
+
+    // We ignore events relating to events older than the current-latest here so
+    // i.e. newly sent edits for older events don't show up in room preview
+    if (isMessageEvent &&
+        state.relationshipEventId != null &&
+        state.relationshipEventId != lastEvent?.eventId) {
       return;
     }
-    if (!states.containsKey(state.type)) {
-      states[state.type] = {};
+
+    // Ignore other non-state events
+    if (!isMessageEvent && state.stateKey == null) {
+      return;
     }
+
+    states[state.type] ??= {};
     states[state.type][state.stateKey ?? ''] = state;
   }
 
@@ -407,6 +394,12 @@ class Room {
           .asUser
           .avatarUrl;
     }
+    if (isDirectChat) {
+      final user = directChatMatrixID;
+      if (user != null) {
+        return getUserByMXIDSync(user).avatarUrl;
+      }
+    }
     if (membership == Membership.invite &&
         getState(EventTypes.RoomMember, client.userID) != null) {
       return getState(EventTypes.RoomMember, client.userID).sender.avatarUrl;
@@ -473,13 +466,16 @@ class Room {
     var lastEvent = lastEvents.isEmpty
         ? null
         : lastEvents.reduce((a, b) {
-            if (a.sortOrder == b.sortOrder) {
+            if (a.originServerTs == b.originServerTs) {
               // if two events have the same sort order we want to give encrypted events a lower priority
               // This is so that if the same event exists in the state both encrypted *and* unencrypted,
               // the unencrypted one is picked
               return a.type == EventTypes.Encrypted ? b : a;
             }
-            return a.sortOrder > b.sortOrder ? a : b;
+            return a.originServerTs.millisecondsSinceEpoch >
+                    b.originServerTs.millisecondsSinceEpoch
+                ? a
+                : b;
           });
     if (lastEvent == null) {
       states.forEach((final String key, final entry) {
@@ -518,9 +514,7 @@ class Room {
     double newestSortOrder = 0.0,
     double oldestSortOrder = 0.0,
     RoomSummary summary,
-  })  : _newestSortOrder = newestSortOrder,
-        _oldestSortOrder = oldestSortOrder,
-        notificationCount = notificationCount ?? 0,
+  })  : notificationCount = notificationCount ?? 0,
         highlightCount = highlightCount ?? 0,
         roomAccountData = roomAccountData ?? <String, BasicRoomEvent>{},
         summary = summary ??
@@ -543,25 +537,17 @@ class Room {
         canonicalAlias.length > 3) {
       return canonicalAlias.localpart;
     }
-    var heroes = <String>[];
-    if (summary.mHeroes != null &&
-        summary.mHeroes.isNotEmpty &&
-        summary.mHeroes.any((h) => h.isNotEmpty)) {
-      heroes = summary.mHeroes;
-    } else {
-      if (states[EventTypes.RoomMember] is Map<String, dynamic>) {
-        for (final entry in states[EventTypes.RoomMember].entries) {
-          final state = entry.value;
-          if (state.type == EventTypes.RoomMember &&
-              state.stateKey != client?.userID) heroes.add(state.stateKey);
-        }
-      }
-    }
-    if (heroes.isNotEmpty) {
-      return heroes
+    if (summary.mHeroes != null && summary.mHeroes.isNotEmpty) {
+      return summary.mHeroes
           .where((hero) => hero.isNotEmpty)
           .map((hero) => getUserByMXIDSync(hero).calcDisplayname())
           .join(', ');
+    }
+    if (isDirectChat) {
+      final user = directChatMatrixID;
+      if (user != null) {
+        return getUserByMXIDSync(user).displayName;
+      }
     }
     if (membership == Membership.invite &&
         getState(EventTypes.RoomMember, client.userID) != null) {
@@ -684,7 +670,9 @@ class Room {
   }
 
   /// Returns true if this room has a m.favourite tag.
-  bool get isFavourite => tags[TagType.favourite] != null;
+  bool get isFavourite =>
+      tags[TagType.favourite] != null ||
+      (client.pinInvitedRooms && membership == Membership.invite);
 
   /// Sets the m.favourite tag for this room.
   Future<void> setFavourite(bool favourite) =>
@@ -1126,7 +1114,6 @@ class Room {
       await client.database.transaction(() async {
         await client.database.setRoomPrevBatch(resp.end, client.id, id);
         await loadFn();
-        await updateSortOrder();
       });
     } else {
       await loadFn();
@@ -1407,10 +1394,10 @@ class Room {
       await client.database.storeEventUpdate(
         client.id,
         EventUpdate(
-            content: content,
-            roomID: id,
-            type: EventUpdateType.state,
-            sortOrder: 0.0),
+          content: content,
+          roomID: id,
+          type: EventUpdateType.state,
+        ),
       );
     });
     onUpdate.add(id);

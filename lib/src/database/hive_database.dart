@@ -36,7 +36,7 @@ import 'package:hive/hive.dart';
 ///
 /// This database does not support file caching!
 class FamedlySdkHiveDatabase extends DatabaseApi {
-  static const int version = 3;
+  static const int version = 4;
   final String name;
   late Box _clientBox;
   late Box _accountDataBox;
@@ -282,8 +282,8 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
     final accountData = <String, BasicEvent>{};
     for (final key in _accountDataBox.keys) {
       final raw = await _accountDataBox.get(key);
-      accountData[key] = BasicEvent(
-        type: key,
+      accountData[key.toString().fromHiveKey] = BasicEvent(
+        type: key.toString().fromHiveKey,
         content: convertToJson(raw),
       );
     }
@@ -310,9 +310,13 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
 
   @override
   Future<List<Event>> getEventList(int clientId, Room room) async {
-    final List eventIds =
+    final List timelineEventIds =
         (await _timelineFragmentsBox.get(MultiKey(room.id, '').toString()) ??
             []);
+    final List sendingEventIds = (await _timelineFragmentsBox
+            .get(MultiKey(room.id, 'SENDING').toString()) ??
+        []);
+    final eventIds = sendingEventIds + timelineEventIds;
     final events = await Future.wait(eventIds
         .map(
           (eventId) async => Event.fromJson(
@@ -323,7 +327,6 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
           ),
         )
         .toList());
-    events.sort((a, b) => b.sortOrder.compareTo(a.sortOrder));
     return events;
   }
 
@@ -812,7 +815,6 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
       eventUpdate.content['unsigned'] ??= <String, dynamic>{};
       eventUpdate.content['unsigned'][messageSendingStatusKey] =
           eventUpdate.content['status'] = status;
-      eventUpdate.content['unsigned'][sortOrderKey] = eventUpdate.sortOrder;
 
       // In case this event has sent from this account we have a transaction ID
       final transactionId = eventUpdate.content
@@ -823,11 +825,26 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
           eventUpdate.content);
 
       // Update timeline fragments
-      final key = MultiKey(eventUpdate.roomID, '').toString();
+      final key =
+          MultiKey(eventUpdate.roomID, status == 2 ? '' : 'SENDING').toString();
       final List eventIds = (await _timelineFragmentsBox.get(key) ?? []);
-      if (!eventIds.any((id) => id == eventId)) {
-        eventIds.add(eventId);
+      if (!eventIds.contains(eventId)) {
+        if (eventUpdate.type == EventUpdateType.history) {
+          eventIds.add(eventId);
+        } else {
+          eventIds.insert(0, eventId);
+        }
         await _timelineFragmentsBox.put(key, eventIds);
+      }
+
+      // If event comes from server timeline, remove sending events with this ID
+      if (status == 2) {
+        final key = MultiKey(eventUpdate.roomID, 'SENDING').toString();
+        final List eventIds = (await _timelineFragmentsBox.get(key) ?? []);
+        final i = eventIds.indexWhere((id) => id == eventId);
+        if (i != -1) {
+          await _timelineFragmentsBox.put(key, eventIds..removeAt(i));
+        }
       }
 
       // Is there a transaction id? Then delete the event with this id.
@@ -979,10 +996,6 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
             prev_batch: roomUpdate.prev_batch ?? currentRoom.prev_batch,
             summary: RoomSummary.fromJson(currentRoom.summary.toJson()
               ..addAll(roomUpdate.summary?.toJson() ?? {})),
-            newestSortOrder:
-                roomUpdate.limitedTimeline ? 0.0 : currentRoom.newSortOrder,
-            oldestSortOrder:
-                roomUpdate.limitedTimeline ? 0.0 : currentRoom.oldSortOrder,
           ).toJson());
     }
 
@@ -1049,8 +1062,57 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
     return;
   }
 
+  Completer<void>? _transactionLock;
+  final _transactionZones = <Zone>{};
+
   @override
-  Future<T> transaction<T>(Future<T> Function() action) => action();
+  Future<T> transaction<T>(Future<T> Function() action) async {
+    // we want transactions to lock, however NOT if transactoins are run inside of each other.
+    // to be able to do this, we use dart zones (https://dart.dev/articles/archive/zones).
+    // _transactionZones holds a set of all zones which are currently running a transaction.
+    // _transactionLock holds the lock.
+
+    // first we try to determine if we are inside of a transaction currently
+    var isInTransaction = false;
+    Zone? zone = Zone.current;
+    // for that we keep on iterating to the parent zone until there is either no zone anymore
+    // or we have found a zone inside of _transactionZones.
+    while (zone != null) {
+      if (_transactionZones.contains(zone)) {
+        isInTransaction = true;
+        break;
+      }
+      zone = zone.parent;
+    }
+    // if we are inside a transaction....just run the action
+    if (isInTransaction) {
+      return await action();
+    }
+    // if we are *not* in a transaction, time to wait for the lock!
+    while (_transactionLock != null) {
+      await _transactionLock!.future;
+    }
+    // claim the lock
+    final lock = Completer<void>();
+    _transactionLock = lock;
+    try {
+      // run the action inside of a new zone
+      return await runZoned(() async {
+        try {
+          // don't forget to add the new zone to _transactionZones!
+          _transactionZones.add(Zone.current);
+          return await action();
+        } finally {
+          // aaaand remove the zone from _transactionZones again
+          _transactionZones.remove(Zone.current);
+        }
+      });
+    } finally {
+      // aaaand finally release the lock
+      _transactionLock = null;
+      lock.complete();
+    }
+  }
 
   @override
   Future<void> updateClient(
@@ -1159,7 +1221,7 @@ class MultiKey {
   const MultiKey.byParts(this.parts);
 
   MultiKey.fromString(String multiKeyString)
-      : parts = multiKeyString.split('|');
+      : parts = multiKeyString.split('|').map((s) => s.fromHiveKey).toList();
 
   @override
   String toString() => parts.map((s) => s.toHiveKey).join('|');
@@ -1172,4 +1234,8 @@ extension HiveKeyExtension on String {
   String get toHiveKey => isValidMatrixId
       ? '$sigil${Uri.encodeComponent(localpart)}:${Uri.encodeComponent(domain)}'
       : Uri.encodeComponent(this);
+}
+
+extension FromHiveKeyExtension on String {
+  String get fromHiveKey => Uri.decodeComponent(this);
 }
