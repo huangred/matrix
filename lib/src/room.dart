@@ -112,8 +112,8 @@ class CallCapabilities {
   CallCapabilities();
   factory CallCapabilities.fromJson(Map<String, dynamic> json) {
     return CallCapabilities()
-      ..dtmf = json['dtmf'] as bool ?? false
-      ..transferee = json['transferee'] as bool ?? false;
+      ..dtmf = json['m.call.dtmf'] as bool ?? false
+      ..transferee = json['m.call.transferee'] as bool ?? false;
   }
   Map<String, dynamic> toJson() {
     return {
@@ -175,18 +175,21 @@ class SDPStreamMetadata {
 /// MSC3086: Asserted identity on VoIP calls
 /// https://github.com/matrix-org/matrix-doc/pull/3086
 class AssertedIdentity {
-  String displayName;
   String id;
+  String displayName;
+  String avatarUrl;
   AssertedIdentity();
   factory AssertedIdentity.fromJson(Map<String, dynamic> json) {
     return AssertedIdentity()
       ..displayName = json['display_name'] as String
-      ..id = json['id'] as String;
+      ..id = json['id'] as String
+      ..avatarUrl = json['avatar_url'] as String;
   }
   Map<String, dynamic> toJson() {
     return {
       if (displayName != null) 'display_name': displayName,
       if (id != null) 'id': id,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
     };
   }
 }
