@@ -35,6 +35,10 @@ import 'utils/marked_unread.dart';
 import 'utils/matrix_file.dart';
 import 'utils/matrix_localizations.dart';
 
+/// https://github.com/matrix-org/matrix-doc/pull/2746
+/// version 1
+const String voipProtoVersion = '1';
+
 enum PushRuleState { notify, mentionsOnly, dontNotify }
 enum JoinRules { public, knock, invite, private }
 enum GuestAccess { canJoin, forbidden }
@@ -1642,7 +1646,7 @@ class Room {
   Future<String> inviteToCall(
       String callId, int lifetime, String party_id, String invitee, String sdp,
       {String type = 'offer',
-      int version = 1,
+      String version = voipProtoVersion,
       String txid,
       CallCapabilities capabilities,
       SDPStreamMetadata metadata}) async {
@@ -1676,7 +1680,7 @@ class Room {
   /// [selected_party_id] The party ID for the selected answer.
   Future<String> selectCallAnswer(
       String callId, int lifetime, String party_id, String selected_party_id,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
@@ -1699,7 +1703,7 @@ class Room {
   /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> sendCallReject(String callId, int lifetime, String party_id,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
@@ -1724,7 +1728,7 @@ class Room {
   Future<String> sendCallNegotiate(
       String callId, int lifetime, String party_id, String sdp,
       {String type = 'offer',
-      int version = 1,
+      String version = voipProtoVersion,
       String txid,
       CallCapabilities capabilities,
       SDPStreamMetadata metadata}) async {
@@ -1769,7 +1773,7 @@ class Room {
     String callId,
     String party_id,
     List<Map<String, dynamic>> candidates, {
-    int version = 1,
+    String version = voipProtoVersion,
     String txid,
   }) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
@@ -1794,7 +1798,7 @@ class Room {
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> answerCall(String callId, String sdp, String party_id,
       {String type = 'answer',
-      int version = 1,
+      String version = voipProtoVersion,
       String txid,
       CallCapabilities capabilities,
       SDPStreamMetadata metadata}) async {
@@ -1819,7 +1823,7 @@ class Room {
   /// [version] is the version of the VoIP specification this message adheres to. This specification is version 1.
   /// [party_id] The party ID for call, Can be set to client.deviceId.
   Future<String> hangupCall(String callId, String party_id, String hangupCause,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
 
     final content = {
@@ -1851,7 +1855,7 @@ class Room {
   /// [metadata] The sdp_stream_metadata object.
   Future<String> sendSDPStreamMetadataChanged(
       String callId, String party_id, SDPStreamMetadata metadata,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
@@ -1874,7 +1878,7 @@ class Room {
   /// [callReplaces] transfer info
   Future<String> sendCallReplaces(
       String callId, String party_id, CallReplaces callReplaces,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
@@ -1897,7 +1901,7 @@ class Room {
   /// [assertedIdentity] the asserted identity
   Future<String> sendAssertedIdentity(
       String callId, String party_id, AssertedIdentity assertedIdentity,
-      {int version = 1, String txid}) async {
+      {String version = voipProtoVersion, String txid}) async {
     txid ??= 'txid${DateTime.now().millisecondsSinceEpoch}';
     final content = {
       'call_id': callId,
