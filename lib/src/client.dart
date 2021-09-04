@@ -25,6 +25,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:matrix/src/utils/run_in_root.dart';
 import 'package:olm/olm.dart' as olm;
+import 'package:pedantic/pedantic.dart';
 
 import '../encryption.dart';
 import '../matrix.dart';
@@ -858,7 +859,7 @@ class Client extends MatrixApi {
   /// If one of [newToken], [newUserID], [newDeviceID], [newDeviceName] is set then
   /// all of them must be set! If you don't set them, this method will try to
   /// get them from the database.
-  Future<void> init({
+  Future init({
     String newToken,
     Uri newHomeserver,
     String newUserID,
@@ -983,7 +984,8 @@ class Client extends MatrixApi {
       Logs().i(
         'Successfully connected as ${userID.localpart} with ${homeserver.toString()}',
       );
-      return _sync();
+
+      unawaited(_sync());
     } catch (e, s) {
       Logs().e('Initialization failed', e, s);
       await logout().catchError((_) => null);
