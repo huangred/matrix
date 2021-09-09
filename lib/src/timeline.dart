@@ -84,7 +84,7 @@ class Timeline {
         room.client.id,
         room,
         start: events.length,
-        limit: Room.defaultHistoryCount,
+        limit: historyCount,
       );
       if (eventsFromStore.isNotEmpty) {
         events.addAll(eventsFromStore);
