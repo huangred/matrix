@@ -1232,6 +1232,54 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
         .map((raw) => StoredInboundGroupSession.fromJson(convertToJson(raw)))
         .toList();
   }
+
+  @override
+  Future<List<Event>> getEvents(
+    int clientId,
+    Room room, {
+    List<String>? eventTypes,
+    List<String>? messageTypes,
+    int start = 0,
+    int count = 50,
+    DateTime? createdAt,
+  }) async {
+    final events = <Event>[];
+
+    for (final key in _eventsBox.keys) {
+      if (!key.toString().contains(room.id)) continue;
+      final value = await _eventsBox.get(key);
+      final event = Event.fromJson(convertToJson(value), room);
+
+      if (eventTypes != null && eventTypes.isNotEmpty) {
+        final isMatch = eventTypes.contains(event.type);
+        if (isMatch) {
+          if (messageTypes != null && messageTypes.isNotEmpty) {
+            if (messageTypes.contains(event.messageType)) events.add(event);
+            continue;
+          }
+
+          events.add(event);
+        }
+        continue;
+      }
+
+      if (messageTypes != null && messageTypes.isNotEmpty) {
+        if (messageTypes.contains(event.messageType)) events.add(event);
+        continue;
+      }
+      if (createdAt != null &&
+          event.originServerTs.compareTo(createdAt) == -1) {
+        events.add(event);
+        continue;
+      }
+      events.add(event);
+    }
+    events.sort((a, b) => b.originServerTs.compareTo(a.originServerTs));
+    return events
+        .getRange(start,
+            start + count > events.length ? events.length : start + count)
+        .toList();
+  }
 }
 
 dynamic _castValue(dynamic value) {
