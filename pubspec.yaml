@@ -1,6 +1,6 @@
 name: matrix
 description: Matrix Dart SDK
-version: 0.4.0
+version: 0.4.3
 homepage: https://famedly.com
 
 environment:
@@ -9,14 +9,14 @@ environment:
 dependencies:
   http: ^0.13.0
   mime: ^1.0.0
-  canonical_json: ^1.0.0
+  canonical_json: ^1.1.0
   markdown: ^4.0.0
   html_unescape: ^2.0.0
-  random_string: ^2.1.0
+  random_string: ^2.3.1
   crypto: ^3.0.0
   base58check: ^2.0.0
   olm: ^2.0.0
-  matrix_api_lite: ^0.4.2
+  matrix_api_lite: ^0.4.3
   hive: ^2.0.4
   ffi: ^1.0.0
   js: ^0.6.3
