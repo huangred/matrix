@@ -1251,34 +1251,24 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
       final value = await _eventsBox.get(key);
       final event = Event.fromJson(convertToJson(value), room);
 
-      if (eventTypes != null && eventTypes.isNotEmpty) {
-        final isMatch = eventTypes.contains(event.type);
-        if (isMatch) {
-          if (messageTypes != null && messageTypes.isNotEmpty) {
-            if (messageTypes.contains(event.messageType)) events.add(event);
-            continue;
-          }
-
-          events.add(event);
-        }
-        continue;
-      }
-
-      if (messageTypes != null && messageTypes.isNotEmpty) {
-        if (messageTypes.contains(event.messageType)) events.add(event);
-        continue;
-      }
-
       if (excludeRedacted && event.redacted) continue;
+      if (eventTypes != null &&
+          eventTypes.isNotEmpty &&
+          !eventTypes.contains(event.type)) continue;
 
-      if (createdAt != null &&
-          event.originServerTs.compareTo(createdAt) == -1) {
-        events.add(event);
+      if (messageTypes != null &&
+          messageTypes.isNotEmpty &&
+          !messageTypes.contains(event.messageType)) continue;
+
+      if (createdAt != null && event.originServerTs.compareTo(createdAt) > -1) {
         continue;
       }
+
       events.add(event);
     }
+
     events.sort((a, b) => b.originServerTs.compareTo(a.originServerTs));
+
     return events
         .getRange(start,
             start + count > events.length ? events.length : start + count)
