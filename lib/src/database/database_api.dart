@@ -330,5 +330,6 @@ abstract class DatabaseApi {
     int start = 0,
     int count,
     DateTime createdAt,
+    bool excludeRedacted,
   });
 }

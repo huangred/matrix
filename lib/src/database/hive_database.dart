@@ -1242,6 +1242,7 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
     int start = 0,
     int count = 50,
     DateTime? createdAt,
+    bool excludeRedacted = true,
   }) async {
     final events = <Event>[];
 
@@ -1267,6 +1268,9 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
         if (messageTypes.contains(event.messageType)) events.add(event);
         continue;
       }
+
+      if (excludeRedacted && event.redacted) continue;
+
       if (createdAt != null &&
           event.originServerTs.compareTo(createdAt) == -1) {
         events.add(event);
