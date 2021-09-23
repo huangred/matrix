@@ -69,6 +69,8 @@ abstract class DatabaseApi {
 
   Future<Event?> getEventById(int clientId, String eventId, Room room);
 
+  bool eventIsKnown(int clientId, String eventId, String roomId);
+
   Future<void> forgetRoom(int clientId, String roomId);
 
   Future<void> clearCache(int clientId);
@@ -317,6 +319,16 @@ abstract class DatabaseApi {
   );
 
   Future<List<StoredInboundGroupSession>> getInboundGroupSessionsToUpload();
+
+  Future<void> addSeenDeviceId(
+      int clientId, String userId, String deviceId, String publicKeys);
+
+  Future<void> addSeenPublicKey(
+      int clientId, String publicKey, String deviceId);
+
+  Future<String?> deviceIdSeen(int clientId, userId, deviceId);
+
+  Future<String?> publicKeySeen(int clientId, String publicKey);
 
   Future<dynamic> close();
 

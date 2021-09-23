@@ -24,8 +24,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:matrix/src/utils/run_in_root.dart';
+import 'package:mime/mime.dart';
 import 'package:olm/olm.dart' as olm;
-import 'package:pedantic/pedantic.dart';
 
 import '../encryption.dart';
 import '../matrix.dart';
@@ -307,8 +307,8 @@ class Client extends MatrixApi {
                 null,
                 (prev, r) => prev == null
                     ? r
-                    : (prev.lastEvent.originServerTs <
-                            r.lastEvent.originServerTs
+                    : (prev.lastEvent.originServerTs.millisecondsSinceEpoch <
+                            r.lastEvent.originServerTs.millisecondsSinceEpoch
                         ? r
                         : prev))
             .id;
@@ -700,6 +700,7 @@ class Client extends MatrixApi {
   @override
   Future<Uri> uploadContent(Uint8List file,
       {String filename, String contentType}) async {
+    contentType ??= lookupMimeType(filename ?? '', headerBytes: file);
     final mxc = await super
         .uploadContent(file, filename: filename, contentType: contentType);
     final storeable = database != null && file.length <= database.maxFileSize;
@@ -728,7 +729,11 @@ class Client extends MatrixApi {
 
   /// Uploads a new user avatar for this user.
   Future<void> setAvatar(MatrixFile file) async {
-    final uploadResp = await uploadContent(file.bytes, filename: file.name);
+    final uploadResp = await uploadContent(
+      file.bytes,
+      filename: file.name,
+      contentType: file.mimeType,
+    );
     await setAvatarUrl(userID, uploadResp);
     return;
   }
@@ -881,6 +886,7 @@ class Client extends MatrixApi {
     String newDeviceName,
     String newDeviceID,
     String newOlmAccount,
+    bool waitForFirstSync = true,
   }) async {
     if ((newToken != null ||
             newUserID != null ||
@@ -1000,7 +1006,11 @@ class Client extends MatrixApi {
         'Successfully connected as ${userID.localpart} with ${homeserver.toString()}',
       );
 
-      unawaited(_sync());
+      final syncFuture = _sync();
+      if (waitForFirstSync) {
+        await syncFuture;
+      }
+      return;
     } catch (e, s) {
       Logs().e('Initialization failed', e, s);
       await logout().catchError((_) => null);
@@ -1140,7 +1150,7 @@ class Client extends MatrixApi {
       // ignore: unawaited_futures
       database?.deleteOldFiles(
           DateTime.now().subtract(Duration(days: 30)).millisecondsSinceEpoch);
-      await _updateUserDeviceKeys();
+      await updateUserDeviceKeys();
       if (encryptionEnabled) {
         encryption.onSync();
       }
@@ -1515,8 +1525,9 @@ class Client extends MatrixApi {
             chatUpdate.timeline?.prevBatch != null)) {
       rooms[j].membership = membership;
       rooms[j].notificationCount =
-          chatUpdate.unreadNotifications?.notificationCount;
-      rooms[j].highlightCount = chatUpdate.unreadNotifications?.highlightCount;
+          chatUpdate.unreadNotifications?.notificationCount ?? 0;
+      rooms[j].highlightCount =
+          chatUpdate.unreadNotifications?.highlightCount ?? 0;
       if (chatUpdate.timeline?.prevBatch != null) {
         rooms[j].prev_batch = chatUpdate.timeline?.prevBatch;
       }
@@ -1644,9 +1655,9 @@ class Client extends MatrixApi {
 
   final Map<String, DateTime> _keyQueryFailures = {};
 
-  Future<void> _updateUserDeviceKeys() async {
+  Future<void> updateUserDeviceKeys() async {
     try {
-      if (!isLogged()) return;
+      if (!isLogged() || database == null) return;
       final dbActions = <Future<dynamic> Function()>[];
       final trackedUserIds = await _getUserIdsInEncryptedRooms();
       if (!isLogged()) return;
@@ -1693,11 +1704,45 @@ class Client extends MatrixApi {
               // Set the new device key for this device
               final entry = DeviceKeys.fromMatrixDeviceKeys(
                   rawDeviceKeyEntry.value, this, oldKeys[deviceId]?.lastActive);
-              if (entry.isValid) {
+              if (entry.isValid && deviceId == entry.deviceId) {
+                // Check if deviceId or deviceKeys are known
+                if (!oldKeys.containsKey(deviceId)) {
+                  final oldPublicKeys =
+                      await database.deviceIdSeen(id, userId, deviceId);
+                  if (oldPublicKeys != null &&
+                      oldPublicKeys != entry.curve25519Key + entry.ed25519Key) {
+                    Logs().w(
+                        'Already seen Device ID has been added again. This might be an attack!');
+                    continue;
+                  }
+                  final oldDeviceId =
+                      await database.publicKeySeen(id, entry.ed25519Key);
+                  if (oldDeviceId != null && oldDeviceId != deviceId) {
+                    Logs().w(
+                        'Already seen ED25519 has been added again. This might be an attack!');
+                    continue;
+                  }
+                  final oldDeviceId2 =
+                      await database.publicKeySeen(id, entry.curve25519Key);
+                  if (oldDeviceId2 != null && oldDeviceId2 != deviceId) {
+                    Logs().w(
+                        'Already seen Curve25519 has been added again. This might be an attack!');
+                    continue;
+                  }
+                  await database.addSeenDeviceId(id, userId, deviceId,
+                      entry.curve25519Key + entry.ed25519Key);
+                  await database.addSeenPublicKey(
+                      id, entry.ed25519Key, deviceId);
+                  await database.addSeenPublicKey(
+                      id, entry.curve25519Key, deviceId);
+                }
+
                 // is this a new key or the same one as an old one?
                 // better store an update - the signatures might have changed!
                 if (!oldKeys.containsKey(deviceId) ||
-                    oldKeys[deviceId].ed25519Key == entry.ed25519Key) {
+                    (oldKeys[deviceId].ed25519Key == entry.ed25519Key &&
+                        oldKeys[deviceId].curve25519Key ==
+                            entry.curve25519Key)) {
                   if (oldKeys.containsKey(deviceId)) {
                     // be sure to save the verified status
                     entry.setDirectVerified(oldKeys[deviceId].directVerified);
@@ -1710,17 +1755,15 @@ class Client extends MatrixApi {
                     // Always trust the own device
                     entry.setDirectVerified(true);
                   }
-                  if (database != null) {
-                    dbActions.add(() => database.storeUserDeviceKey(
-                          id,
-                          userId,
-                          deviceId,
-                          json.encode(entry.toJson()),
-                          entry.directVerified,
-                          entry.blocked,
-                          entry.lastActive.millisecondsSinceEpoch,
-                        ));
-                  }
+                  dbActions.add(() => database.storeUserDeviceKey(
+                        id,
+                        userId,
+                        deviceId,
+                        json.encode(entry.toJson()),
+                        entry.directVerified,
+                        entry.blocked,
+                        entry.lastActive.millisecondsSinceEpoch,
+                      ));
                 } else if (oldKeys.containsKey(deviceId)) {
                   // This shouldn't ever happen. The same device ID has gotten
                   // a new public key. So we ignore the update. TODO: ask krille
@@ -1733,14 +1776,12 @@ class Client extends MatrixApi {
               }
             }
             // delete old/unused entries
-            if (database != null) {
-              for (final oldDeviceKeyEntry in oldKeys.entries) {
-                final deviceId = oldDeviceKeyEntry.key;
-                if (!_userDeviceKeys[userId].deviceKeys.containsKey(deviceId)) {
-                  // we need to remove an old key
-                  dbActions.add(
-                      () => database.removeUserDeviceKey(id, userId, deviceId));
-                }
+            for (final oldDeviceKeyEntry in oldKeys.entries) {
+              final deviceId = oldDeviceKeyEntry.key;
+              if (!_userDeviceKeys[userId].deviceKeys.containsKey(deviceId)) {
+                // we need to remove an old key
+                dbActions.add(
+                    () => database.removeUserDeviceKey(id, userId, deviceId));
               }
             }
             _userDeviceKeys[userId].outdated = false;
@@ -1930,6 +1971,7 @@ class Client extends MatrixApi {
     // then only send it to verified devices
     if (deviceKeys.isNotEmpty) {
       deviceKeys.removeWhere((DeviceKeys deviceKeys) =>
+          deviceKeys == null ||
           deviceKeys.blocked ||
           (deviceKeys.userId == userID && deviceKeys.deviceId == deviceID) ||
           (onlyVerified && !deviceKeys.verified));

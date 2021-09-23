@@ -323,16 +323,26 @@ class Room {
       EventTypes.Encrypted,
     ].contains(state.type);
 
-    // We ignore events relating to events older than the current-latest here so
+    // We ignore events editing events older than the current-latest here so
     // i.e. newly sent edits for older events don't show up in room preview
     if (isMessageEvent &&
         state.relationshipEventId != null &&
+        state.relationshipType == RelationshipTypes.edit &&
         state.relationshipEventId != lastEvent?.eventId) {
       return;
     }
 
     // Ignore other non-state events
     if (!isMessageEvent && state.stateKey == null) {
+      return;
+    }
+
+    // Do not set old events as state events
+    final prevEvent = getState(state.type, state.stateKey);
+    if (prevEvent != null &&
+        prevEvent.eventId != state.eventId &&
+        client.database != null &&
+        client.database.eventIsKnown(client.id, state.eventId, state.roomId)) {
       return;
     }
 
@@ -625,7 +635,7 @@ class Room {
   static Tag _tryTagFromJson(Object o) {
     if (o is Map<String, dynamic>) {
       return Tag(
-          order: o.tryGet<num>('order')?.toDouble(),
+          order: o.tryGet<num>('order', TryGet.silent)?.toDouble(),
           additionalProperties: Map.from(o)..remove('order'));
     }
     return Tag();

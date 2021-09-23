@@ -1,3 +1,30 @@
+## [0.5.5] - 20nd Sep 2021
+ fix: Autodetect mime type on file upload
+
+## [0.5.4] - 20nd Sep 2021
+- feat: Add waitForFirstSync parameter to init method
+
+## [0.5.3] - 19nd Sep 2021
+- feat: Add /discardsession command
+- fix: Auto-reply key requests
+- fix: Room previews not showing replies
+- fix: missing content-type when changing avatar
+- fix: only/number emotes in a reply
+
+## [0.5.2] - 14nd Sep 2021
+- fix: Delete box if it can not be cleared when calling database.clear() -> This should fix some box corruption problems
+- fix: Do not set old events as state events -> This should fix the room list sort ordering bug
+
+## [0.5.1] - 13nd Sep 2021
+- fix: Room.notificationCount set to null sometimes
+
+## [0.5.0] - 13nd Sep 2021
+- hotfix: Key sharing security vulnerability! -> Please upgrade as soon as possible to this version
+- feat: MSC2746: Improved Signalling for 1:1 VoIP
+- fix: Get direct chat from user ID method crashes on more than one DM rooms with one account
+- fix: compilation against newer matrix_api_lite
+- refactor: Remove onRoomUpdate stream
+
 ## [0.4.3] - 8nd Sep 2021
 - fix: Do not handle sending event updates which are already synced
 
