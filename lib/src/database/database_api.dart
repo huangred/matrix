@@ -339,7 +339,6 @@ abstract class DatabaseApi {
     Room room, {
     List<String> eventTypes,
     List<String> messageTypes,
-    int start = 0,
     int count,
     DateTime createdAt,
     bool excludeRedacted,

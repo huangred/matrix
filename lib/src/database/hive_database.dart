@@ -1326,7 +1326,6 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
     Room room, {
     List<String>? eventTypes,
     List<String>? messageTypes,
-    int start = 0,
     int count = 50,
     DateTime? createdAt,
     bool excludeRedacted = true,
@@ -1335,6 +1334,7 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
 
     for (final key in _eventsBox.keys) {
       if (!key.toString().contains(room.id)) continue;
+
       final value = await _eventsBox.get(key);
       final event = Event.fromJson(convertToJson(value), room);
 
@@ -1357,8 +1357,7 @@ class FamedlySdkHiveDatabase extends DatabaseApi {
     events.sort((a, b) => b.originServerTs.compareTo(a.originServerTs));
 
     return events
-        .getRange(start,
-            start + count > events.length ? events.length : start + count)
+        .getRange(0, count > events.length ? events.length : count)
         .toList();
   }
 }
